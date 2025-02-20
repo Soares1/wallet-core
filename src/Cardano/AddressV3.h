@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #pragma once
 
@@ -35,6 +33,7 @@ class AddressV3 {
         //Kind_Bootstrap = 8, // Byron
         Kind_Reward = 14, // // staking key
         //Kind_Reward_Script = 15,
+        Kind_DRep = 99, // DRep key
     };
 
     static const uint8_t HashSize = 28;
@@ -67,6 +66,9 @@ class AddressV3 {
 
     /// Create a staking (reward) address, given a staking key
     static AddressV3 createReward(NetworkId networkId, const TW::Data& stakingKeyHash);
+
+    /// Create a DRep address, given a DRep key. Throws if invalid.
+    static AddressV3 createDRep(const std::string& addr);
 
     /// Initializes a Cardano address with a string representation.  Throws if invalid.
     explicit AddressV3(const std::string& addr);

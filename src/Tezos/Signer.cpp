@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Signer.h"
 #include "OperationList.h"
@@ -18,14 +16,18 @@ using namespace TW;
 namespace TW::Tezos {
 
 Proto::SigningOutput Signer::sign(const Proto::SigningInput& input) noexcept {
-    auto operationList = Tezos::OperationList(input.operation_list().branch());
-    for (Proto::Operation operation : input.operation_list().operations()) {
-        operationList.addOperation(operation);
-    }
-
     auto signer = Signer();
     PrivateKey key = PrivateKey(Data(input.private_key().begin(), input.private_key().end()));
-    Data encoded = signer.signOperationList(key, operationList);
+    Data encoded;
+    if (input.encoded_operations().empty()) {
+        auto operationList = Tezos::OperationList(input.operation_list().branch());
+        for (Proto::Operation operation : input.operation_list().operations()) {
+            operationList.addOperation(operation);
+        }
+        encoded = signer.signOperationList(key, operationList);
+    } else {
+        encoded = signer.signData(key, TW::data(input.encoded_operations()));
+    }
 
     auto output = Proto::SigningOutput();
     output.set_encoded(encoded.data(), encoded.size());
@@ -56,6 +58,22 @@ Data Signer::signData(const PrivateKey& privateKey, const Data& data) {
     Data signedData = Data();
     append(signedData, data);
     append(signedData, signature);
+    return signedData;
+}
+
+Data Signer::buildUnsignedTx(const OperationList& operationList) {
+    Data txData = operationList.forge();
+    return txData;
+}
+
+Data Signer::buildSignedTx(const OperationList& operationList, Data signature) {
+    Data signedData = Data();
+
+    Data txData = operationList.forge();
+
+    append(signedData, txData);
+    append(signedData, signature);
+
     return signedData;
 }
 

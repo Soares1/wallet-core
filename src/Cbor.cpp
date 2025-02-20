@@ -1,11 +1,10 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Cbor.h"
 #include "HexCoding.h"
+#include "Numeric.h"
 
 #include <sstream>
 #include <cassert>
@@ -73,6 +72,12 @@ Encode Encode::tag(uint64_t value, const Encode& elem) {
 Encode Encode::null() {
     Encode e;
     e.appendValue(Decode::MT_special, 0x16);
+    return e;
+}
+
+Encode Encode::version(uint64_t value) {
+    Encode e;
+    e.appendValue(Decode::MT_special, value);
     return e;
 }
 
@@ -311,8 +316,11 @@ vector<Decode> Decode::getCompoundElements(uint32_t countMultiplier, TW::byte ex
             break;
         }
         uint32_t elemLen = nextElem.getTotalLen();
+        if (elemLen == 0 || checkAddUnsignedOverflow(idx, elemLen)) {
+            throw std::invalid_argument("CBOR invalid element length");
+        }
         if (idx + elemLen > length()) {
-            throw std::invalid_argument("CBOR array data too short");
+            throw std::invalid_argument("CBOR invalid array data");
         }
         elems.emplace_back(Decode(data, subStart + idx, elemLen));
         idx += elemLen;

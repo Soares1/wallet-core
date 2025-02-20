@@ -1,8 +1,6 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Tezos/BinaryCoding.h"
 #include "Tezos/Forging.h"
@@ -18,7 +16,7 @@ TEST(TezosPublicKey, forge) {
     auto input = parsePublicKey("edpkuAfEJCEatRgFpRGg3gn3FdWniLXBoubARreRwuVZPWufkgDBvR");
     auto expected = "00451bde832454ba73e6e0de313fcf5d1565ec51080edc73bb19287b8e0ab2122b";
     auto serialized = forgePublicKey(input);
-    ASSERT_EQ(hex(serialized.begin(), serialized.end()), expected);
+    ASSERT_EQ(hex(serialized), expected);
 }
 
 TEST(TezosPublicKey, parse) {

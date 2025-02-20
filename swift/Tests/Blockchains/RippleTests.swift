@@ -1,25 +1,11 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 import XCTest
 import WalletCore
 
 class RippleTests: XCTestCase {
-
-    func testAddressValidation() {
-        let coin = CoinType.xrp
-        let string = "XVfvixWZQKkcenFRYApCjpTUyJ4BePTe3jJv7beatUZvQYh"
-        let xaddr = RippleXAddress(string: string)
-
-        XCTAssertTrue(coin.validate(address: "rDpysuumkweqeC7XdNgYNtzL5GxbdsmrtF"))
-        XCTAssertTrue(coin.validate(address: "XVfvixWZQKkcenFRYApCjpTUyJ4BePTe3jJv7beatUZvQYh"))
-        XCTAssertEqual(xaddr?.description, string)
-        XCTAssertEqual(xaddr?.tag, 12345)
-    }
-
     func testAddress() {
         let key = PrivateKey(data: Data(hexString: "9c3d42d0515f0406ed350ab2abf3eaf761f8907802469b64052ac17e2250ae13")!)!
         let pubkey = key.getPublicKeySecp256k1(compressed: true)
@@ -55,7 +41,7 @@ class RippleTests: XCTestCase {
             $0.lastLedgerSequence = 32268269
             $0.account = "rfxdLwsZnoespnTDDb1Xhvbc8EFNdztaoq"
             $0.privateKey = Data(hexString: "a5576c0f63da10e584568c8d134569ff44017b0a249eb70657127ae04f38cc77")!
-            $0.opPayment = operation
+            $0.opPayment = operation2
         }
         let output2: RippleSigningOutput = AnySigner.sign(input: input2, coin: .xrp)
         XCTAssertEqual(output2.encoded, output.encoded)

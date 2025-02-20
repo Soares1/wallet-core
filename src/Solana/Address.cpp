@@ -1,31 +1,20 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Address.h"
-#include "Program.h"
-#include "Transaction.h"
-#include "../Base58.h"
-#include "../Base58Address.h"
-#include "../Hash.h"
-
-#include <TrezorCrypto/ed25519-donna/ed25519-donna.h>
-
-#include <cassert>
 
 using namespace TW;
 
 namespace TW::Solana {
 
 bool Address::isValid(const std::string& string) {
-    const auto data = Base58::bitcoin.decode(string);
+    const auto data = Base58::decode(string);
     return Address::isValid(data);
 }
 
 Address::Address(const std::string& string) {
-    const auto data = Base58::bitcoin.decode(string);
+    const auto data = Base58::decode(string);
     if (!isValid(data)) {
         throw std::invalid_argument("Invalid address string");
     }
@@ -48,16 +37,11 @@ Address::Address(const Data& publicKeyData) {
 }
 
 std::string Address::string() const {
-    return Base58::bitcoin.encode(bytes);
+    return Base58::encode(bytes);
 }
 
 Data Address::vector() const {
-    Data vec(std::begin(bytes), std::end(bytes));
-    return vec;
-}
-
-Address Address::defaultTokenAddress(const Address& tokenMintAddress) {
-    return TokenProgram::defaultTokenAddress(*this, tokenMintAddress);
+    return Data(begin(bytes), end(bytes));
 }
 
 } // namespace TW::Solana
