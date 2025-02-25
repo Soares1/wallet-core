@@ -1,28 +1,61 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
+
+#include <google/protobuf/stubs/strutil.h>
 
 #include "Transaction.h"
+#include "AddressV3.h"
 
 #include "Cbor.h"
 #include "Hash.h"
 #include "HexCoding.h"
+#include "Numeric.h"
+#include "rust/Wrapper.h"
 
 namespace TW::Cardano {
 
 TokenAmount TokenAmount::fromProto(const Proto::TokenAmount& proto) {
-    return {proto.policy_id(), proto.asset_name(), load(proto.amount())};
+    Data assetName;
+    if (!proto.asset_name().empty()) {
+        assetName = data(proto.asset_name());
+    } else if (!proto.asset_name_hex().empty()) {
+        auto assetNameData = parse_hex(proto.asset_name_hex());
+        assetName.assign(assetNameData.data(), assetNameData.data() + assetNameData.size());
+    }
+
+    return {proto.policy_id(), std::move(assetName), load(proto.amount())};
 }
 
 Proto::TokenAmount TokenAmount::toProto() const {
+    auto assetNameHex = hex(assetName);
+
     Proto::TokenAmount tokenAmount;
     tokenAmount.set_policy_id(policyId.data(), policyId.size());
-    tokenAmount.set_asset_name(assetName.data(), assetName.size());
+    tokenAmount.set_asset_name_hex(assetNameHex.data(), assetNameHex.size());
     const auto amountData = store(amount);
     tokenAmount.set_amount(amountData.data(), amountData.size());
+
+    if (const auto assetNameStr = assetNameToString(); assetNameStr.has_value()) {
+        tokenAmount.set_asset_name(assetNameStr.value().data(), assetNameStr.value().size());
+    }
     return tokenAmount;
+}
+
+std::string TokenAmount::displayAssetName() const {
+    if (const auto assetNameStr = assetNameToString(); assetNameStr.has_value()) {
+        return std::move(assetNameStr.value());
+    }
+    return hex(assetName);
+}
+
+std::optional<std::string> TokenAmount::assetNameToString() const {
+    if (!Rust::tw_string_is_utf8_bytes(assetName.data(), assetName.size())) {
+        return std::nullopt;
+    }
+    std::string assetNameStr;
+    assetNameStr.assign(assetName.data(), assetName.data() + assetName.size());
+    return assetNameStr;
 }
 
 TokenBundle TokenBundle::fromProto(const Proto::TokenBundle& proto) {
@@ -97,17 +130,19 @@ uint64_t TokenBundle::minAdaAmount() const {
     }
 
     std::unordered_set<std::string> policyIdRegistry;
-    std::unordered_set<std::string> assetNameRegistry;
+    std::unordered_set<Data, DataHash> assetNameRegistry;
     uint64_t sumAssetNameLengths = 0;
     for (const auto& t : bundle) {
         policyIdRegistry.emplace(t.second.policyId);
-        if (t.second.assetName.length() > 0) {
+        if (!t.second.assetName.empty()) {
             assetNameRegistry.emplace(t.second.assetName);
         }
     }
+
     auto numPids = uint64_t(policyIdRegistry.size());
     auto numAssets = uint64_t(assetNameRegistry.size());
-    for_each(assetNameRegistry.begin(), assetNameRegistry.end(), [&sumAssetNameLengths](auto&& a) { sumAssetNameLengths += a.length(); });
+    for_each(assetNameRegistry.begin(), assetNameRegistry.end(), [&sumAssetNameLengths](auto&& a){ sumAssetNameLengths += a.size(); });
+    
     return minAdaAmountHelper(numPids, numAssets, sumAssetNameLengths);
 }
 
@@ -136,6 +171,28 @@ Proto::TxInput TxInput::toProto() const {
     return txInput;
 }
 
+TxOutput TxOutput::fromProto(const Cardano::Proto::TxOutput& proto) {
+    auto ret = TxOutput();
+    ret.address = data(proto.address());
+    ret.amount = proto.amount();
+    for (auto i = 0; i < proto.token_amount_size(); ++i) {
+        auto ta = TokenAmount::fromProto(proto.token_amount(i));
+        ret.tokenBundle.add(ta);
+    }
+    return ret;
+}
+
+Proto::TxOutput TxOutput::toProto() const {
+    Proto::TxOutput txOutput;
+    const auto toAddress = AddressV3(address);
+    txOutput.set_address(toAddress.string());
+    txOutput.set_amount(amount);
+    for (const auto& token : tokenBundle.bundle) {
+        *txOutput.add_token_amount() = token.second.toProto();
+    }
+    return txOutput;
+}
+
 bool operator==(const TxInput& i1, const TxInput& i2) {
     return i1.outputIndex == i2.outputIndex && i1.txHash == i2.txHash;
 }
@@ -160,6 +217,9 @@ TransactionPlan TransactionPlan::fromProto(const Proto::TransactionPlan& proto) 
     for (auto i = 0; i < proto.utxos_size(); ++i) {
         ret.utxos.emplace_back(TxInput::fromProto(proto.utxos(i)));
     }
+    for (auto i = 0; i < proto.extra_outputs_size(); ++i) {
+        ret.extraOutputs.emplace_back(TxOutput::fromProto(proto.extra_outputs(i)));
+    }
     ret.error = proto.error();
     return ret;
 }
@@ -183,6 +243,9 @@ Proto::TransactionPlan TransactionPlan::toProto() const {
     }
     for (const auto& u : utxos) {
         *plan.add_utxos() = u.toProto();
+    }
+    for (const auto& u : extraOutputs) {
+        *plan.add_extra_outputs() = u.toProto();
     }
     plan.set_error(error);
     return plan;
@@ -215,7 +278,7 @@ Cbor::Encode cborizeOutputAmounts(const Amount& amount, const TokenBundle& token
         std::map<Cbor::Encode, Cbor::Encode> subTokensMap;
         for (const auto& token : subTokens) {
             subTokensMap.emplace(
-                Cbor::Encode::bytes(data(token.assetName)),
+                Cbor::Encode::bytes(token.assetName),
                 Cbor::Encode::uint(uint64_t(token.amount)) // 64 bits
             );
         }
@@ -255,12 +318,24 @@ Cbor::Encode cborizeCertificateKey(const CertificateKey& certKey) {
     return Cbor::Encode::array(c);
 }
 
+Cbor::Encode cborizeDRepKey(const DRepKey& drepKey) {
+    std::vector<Cbor::Encode> c;
+    c.emplace_back(Cbor::Encode::uint(static_cast<uint8_t>(drepKey.type)));
+    if (drepKey.type == DRepKey::KeyType::AddressKeyHash) {
+        c.emplace_back(Cbor::Encode::bytes(drepKey.key));
+    }
+    return Cbor::Encode::array(c);
+}
+
 Cbor::Encode cborizeCert(const Certificate& cert) {
     std::vector<Cbor::Encode> c;
     c.emplace_back(Cbor::Encode::uint(static_cast<uint8_t>(cert.type)));
     c.emplace_back(cborizeCertificateKey(cert.certKey));
     if (!cert.poolId.empty()) {
         c.emplace_back(Cbor::Encode::bytes(cert.poolId));
+    }
+    if (cert.drepKey.has_value()) {
+        c.emplace_back(cborizeDRepKey(cert.drepKey.value()));
     }
     return Cbor::Encode::array(c);
 }
@@ -311,6 +386,34 @@ Data Transaction::getId() const {
     const auto encoded = encode();
     auto hash = Hash::blake2b(encoded, 32);
     return hash;
+}
+
+/// https://github.com/Emurgo/cardano-serialization-lib/blob/78184e0a2c207c2f8bba57b0d3c437f4c808c125/rust/src/utils.rs#L1415
+std::optional<uint64_t> minAdaAmountHelper(const TxOutput& output, uint64_t coinsPerUtxoByte) noexcept {
+    const size_t outputSize = cborizeOutput(output).encoded().size();
+    const auto outputSizeExtended = static_cast<uint64_t>(outputSize + 160);
+    if (checkMulUnsignedOverflow(outputSizeExtended, coinsPerUtxoByte)) {
+        return std::nullopt;
+    }
+    return outputSizeExtended * coinsPerUtxoByte;
+}
+
+/// https://github.com/Emurgo/cardano-serialization-lib/blob/78184e0a2c207c2f8bba57b0d3c437f4c808c125/rust/src/utils.rs#L1388
+std::optional<uint64_t> TxOutput::minAdaAmount(uint64_t coinsPerUtxoByte) const noexcept {
+    // A copy of `this`.
+    TxOutput output(address, amount, tokenBundle);
+
+    while (true) {
+        const auto minAmount = minAdaAmountHelper(output, coinsPerUtxoByte);
+        if (!minAmount) {
+            return std::nullopt;
+        }
+        if (output.amount >= *minAmount) {
+            return minAmount;
+        }
+        // Set the amount to `minAmount` and re-try again.
+        output.amount = *minAmount;
+    }
 }
 
 } // namespace TW::Cardano

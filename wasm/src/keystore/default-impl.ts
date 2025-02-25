@@ -1,10 +1,8 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
-import {WalletCore, CoinType, PrivateKey, StoredKey, StoredKeyEncryption} from "../wallet-core";
+import {WalletCore, CoinType, Derivation, PrivateKey, StoredKey, StoredKeyEncryption} from "../wallet-core";
 import * as Types from "./types";
 
 export class Default implements Types.IKeyStore {
@@ -111,11 +109,21 @@ export class Default implements Types.IKeyStore {
     password: string,
     coins: CoinType[]
   ): Promise<Types.Wallet> {
+    const { Derivation } = this.core;
+
+    let coins_with_derivations = coins.map(coin => ({
+      coin: coin,
+      derivation: Derivation.default,
+    }));
+    return this.addAccountsWithDerivations(id, password, coins_with_derivations);
+  }
+
+  addAccountsWithDerivations(id: string, password: string, coins: Types.CoinWithDerivation[]): Promise<Types.Wallet> {
     return this.load(id).then((wallet) => {
       let storedKey = this.mapStoredKey(wallet);
       let hdWallet = storedKey.wallet(Buffer.from(password));
-      coins.forEach((coin) => {
-        storedKey.accountForCoin(coin, hdWallet);
+      coins.forEach((item) => {
+        storedKey.accountForCoinDerivation(item.coin, item.derivation, hdWallet);
       });
       let newWallet = this.mapWallet(storedKey);
       storedKey.delete();

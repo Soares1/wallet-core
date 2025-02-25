@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Nebulas/Address.h"
 #include "HexCoding.h"
@@ -27,7 +25,7 @@ TEST(NebulasAddress, String) {
     ASSERT_THROW(Address("abc"), std::invalid_argument);
     ASSERT_EQ(Address("n1V5bB2tbaM3FUiL4eRwpBLgEredS5C2wLY").string(),
               "n1V5bB2tbaM3FUiL4eRwpBLgEredS5C2wLY");
-    ASSERT_EQ(Address(Base58::bitcoin.decode("n1TgpFZWCMmFd2sphb6RKsCvsEyMCNa2Yyv")).string(),
+    ASSERT_EQ(Address(Base58::decode("n1TgpFZWCMmFd2sphb6RKsCvsEyMCNa2Yyv")).string(),
               "n1TgpFZWCMmFd2sphb6RKsCvsEyMCNa2Yyv");
 
     const auto address = Address("n1V5bB2tbaM3FUiL4eRwpBLgEredS5C2wLY");
@@ -37,7 +35,7 @@ TEST(NebulasAddress, String) {
 TEST(NebulasAddress, Data) {
     Data data;
     EXPECT_THROW(Address(data).string(), std::invalid_argument);
-    ASSERT_EQ(Address(Base58::bitcoin.decode("n1V5bB2tbaM3FUiL4eRwpBLgEredS5C2wLY")).string(),
+    ASSERT_EQ(Address(Base58::decode("n1V5bB2tbaM3FUiL4eRwpBLgEredS5C2wLY")).string(),
               "n1V5bB2tbaM3FUiL4eRwpBLgEredS5C2wLY");
 }
 

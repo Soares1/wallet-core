@@ -1,18 +1,17 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Base58.h"
 #include "Bitcoin/Address.h"
 #include "Bitcoin/CashAddress.h"
 #include "Bitcoin/SegwitAddress.h"
+#include "IoTeX/Address.h"
+#include "Cosmos/Address.h"
 #include "Coin.h"
 #include "Ethereum/Address.h"
-#include "Ethereum/Signer.h"
-#include "Ethereum/EIP191.h"
 #include "Ethereum/EIP2645.h"
+#include "Ethereum/MessageSigner.h"
 #include "HDWallet.h"
 #include "Hash.h"
 #include "Hedera/DER.h"
@@ -21,8 +20,8 @@
 #include "Mnemonic.h"
 #include "NEAR/Address.h"
 #include "PublicKey.h"
-#include "TestUtilities.h"
 #include "StarkEx/MessageSigner.h"
+#include "TestUtilities.h"
 
 #include <gtest/gtest.h>
 
@@ -463,11 +462,8 @@ TEST(HDWallet, HederaKey) {
 }
 
 TEST(HDWallet, FromSeedStark) {
-    std::string signature = "0x5a263fad6f17f23e7c7ea833d058f3656d3fe464baf13f6f5ccba9a2466ba2ce4c4a250231bcac7beb165aec4c9b049b4ba40ad8dd287dc79b92b1ffcf20cdcf1b";
-    auto data = parse_hex(signature);
-    auto ethSignature = Ethereum::Signer::signatureDataToStructSimple(data);
-    auto seed = store(ethSignature.s);
-    ASSERT_EQ(ethSignature.s, uint256_t("34506778598894488719068064129252410649539581100963007245393949841529394744783"));
+    auto seed = parse_hex("4c4a250231bcac7beb165aec4c9b049b4ba40ad8dd287dc79b92b1ffcf20cdcf");
+    ASSERT_EQ(load(seed), uint256_t("34506778598894488719068064129252410649539581100963007245393949841529394744783"));
     auto derivationPath = DerivationPath("m/2645'/579218131'/211006541'/1534045311'/1431804530'/1");
     auto key = HDWallet<32>::bip32DeriveRawSeed(TWCoinTypeEthereum, seed, derivationPath);
     ASSERT_EQ(hex(key.bytes), "57384e99059bb1c0e51d70f0fca22d18d7191398dd39d6b9b4e0521174b2377a");
@@ -544,7 +540,7 @@ TEST(HDWallet, FromMnemonicImmutableXMainnet) {
         ASSERT_EQ(ethAddressFromPub, ethAddress);
 
         std::string tosign = "Only sign this request if you’ve initiated an action with Immutable X.\n\nFor internal use:\nbd717ba31dca6e0f3f136f7c4197babce5f09a9f25176044c0b3112b1b6017a3";
-        auto hexEthSignature = Ethereum::MessageSigner::signMessage(ethPrivKey, tosign);
+        auto hexEthSignature = Ethereum::MessageSigner::signMessage(ethPrivKey, tosign, Ethereum::MessageType::ImmutableX);
 
         ASSERT_EQ(hexEthSignature, "32cd5a58f3419fc5db672e3d57f76199b853eda0856d491b38f557b629b0a0814ace689412bf354a1af81126d2749207dffae8ae8845160f33948a6b787e17ee01");
     }
@@ -577,19 +573,43 @@ TEST(HDWallet, FromMnemonicImmutableXMainnetFromSignature) {
         ASSERT_EQ(hex(ethPrivKey.bytes), "03a9ca895dca1623c7dfd69693f7b4111f5d819d2e145536e0b03c136025a25d");
         auto ethAddressFromPub = Ethereum::Address(ethPrivKey.getPublicKey(TWPublicKeyTypeSECP256k1Extended)).string();
         ASSERT_EQ(ethAddressFromPub, ethAddress);
-        auto signature = Ethereum::MessageSigner::signMessage(ethPrivKey, "Only sign this request if you’ve initiated an action with Immutable X.");
+        auto signature = Ethereum::MessageSigner::signMessage(ethPrivKey, "Only sign this request if you’ve initiated an action with Immutable X.", Ethereum::MessageType::ImmutableX);
         ASSERT_EQ(signature, "18b1be8b78807d3326e28bc286d7ee3d068dcd90b1949ce1d25c1f99825f26e70992c5eb7f44f76b202aceded00d74f771ed751f2fe538eec01e338164914fe001");
         auto starkPrivKey = ImmutableX::getPrivateKeyFromRawSignature(parse_hex(signature), DerivationPath(derivationPath));
         auto starkPubKey  = starkPrivKey.getPublicKey(TWPublicKeyTypeStarkex);
         ASSERT_EQ(hex(starkPrivKey.bytes), "04be51a04e718c202e4dca60c2b72958252024cfc1070c090dd0f170298249de");
         ASSERT_EQ(hex(starkPubKey.bytes), "00e5b9b11f8372610ef35d647a1dcaba1a4010716588d591189b27bf3c2d5095");
-        auto signatureToSend = Ethereum::MessageSigner::signMessage(ethPrivKey, "Only sign this key linking request from Immutable X");
+        auto signatureToSend = Ethereum::MessageSigner::signMessage(ethPrivKey, "Only sign this key linking request from Immutable X", Ethereum::MessageType::ImmutableX);
         ASSERT_EQ(signatureToSend, "646da4160f7fc9205e6f502fb7691a0bf63ecbb74bbb653465cd62388dd9f56325ab1e4a9aba99b1661e3e6251b42822855a71e60017b310b9f90e990a12e1dc01");
 
         auto starkMsg = "463a2240432264a3aa71a5713f2a4e4c1b9e12bbb56083cd56af6d878217cf";
         auto starkSignature = StarkEx::MessageSigner::signMessage(starkPrivKey, starkMsg);
         ASSERT_EQ(starkSignature, "04cf5f21333dd189ada3c0f2a51430d733501a9b1d5e07905273c1938cfb261e05b6013d74adde403e8953743a338c8d414bb96bf69d2ca1a91a85ed2700a528");
         ASSERT_TRUE(StarkEx::MessageSigner::verifyMessage(starkPubKey, starkMsg, starkSignature));
+    }
+}
+
+TEST(HDWallet, StargazeKey) {
+    const auto derivPath = "m/44'/118'/0'/0/0";
+    HDWallet wallet = HDWallet("rude segment two fury you output manual volcano sugar draft elite fame", "");
+    {
+        const auto privateKey = wallet.getKey(TWCoinTypeStargaze, DerivationPath(derivPath));
+        EXPECT_EQ(hex(privateKey.bytes), "a498a9ee41af9bab5ef2a8be63d5c970135c3c109e70efc8c56c534e6636b433");
+        const auto p = privateKey.getPublicKey(TWPublicKeyTypeSECP256k1);
+        EXPECT_EQ(hex(p.bytes), "02cbfdb5e472893322294e60cf0883d43df431e1089d29ecb447a9e6d55045aae5");
+        EXPECT_EQ(Cosmos::Address(TWCoinTypeStargaze ,p).string(), "stars1mry47pkga5tdswtluy0m8teslpalkdq02a8nhy");
+    }
+}
+
+TEST(HDWallet, CoreumKey) {
+    const auto derivPath = "m/44'/990'/0'/0/0";
+    HDWallet wallet = HDWallet("rude segment two fury you output manual volcano sugar draft elite fame", "");
+    {
+        const auto privateKey = wallet.getKey(TWCoinTypeCoreum, DerivationPath(derivPath));
+        EXPECT_EQ(hex(privateKey.bytes), "56e5e45bf33a779527ec670b5336f6bc78efbe0e3bf1f004e7250673a82a3431");
+        const auto p = privateKey.getPublicKey(TWPublicKeyTypeSECP256k1);
+        EXPECT_EQ(hex(p.bytes), "0345d8d927b955c3cd468d12b5bc634c7919ee4777e578439af6314cf04b2ff114");
+        EXPECT_EQ(Cosmos::Address(TWCoinTypeCoreum ,p).string(), "core1a5nvz6smgsph9gephguyhn30fmzrpaxrvvdjun");
     }
 }
 
@@ -603,6 +623,31 @@ TEST(HDWallet, NearKey) {
         EXPECT_EQ(hex(p.bytes), "b8d5df25047841365008f30fb6b30dd820e9a84d869f05623d114e96831f2fbf");
         EXPECT_EQ(NEAR::Address(p).string(), "b8d5df25047841365008f30fb6b30dd820e9a84d869f05623d114e96831f2fbf");
     }
+}
+
+TEST(HDWallet, IoTexEvmKeys) {
+    const auto derivPath = "m/44'/304'/0'/0/0";
+    HDWallet wallet = HDWallet("token major laundry actor dish lunch physical machine kingdom adapt gym true", "");
+    {
+        const auto privateKey = wallet.getKey(TWCoinTypeEthereum, DerivationPath(derivPath));
+        EXPECT_EQ(hex(privateKey.bytes), "3aa86eafa99cb9ae0f7c1c4f06391ffbef91578169715dfbdcdf76b532b73f24");
+        const auto p = privateKey.getPublicKey(TWPublicKeyTypeSECP256k1Extended);
+        EXPECT_EQ(hex(p.bytes), "042be00e86db75bbe3e8defe9bb09fbd5444eea10e2d53d55468f3d25bf3b0cb3ea8d992baba30c9353584b8ff061f8585cae1c792b8bb6f0607750dbf4fe8c760");
+        EXPECT_EQ(Ethereum::Address(p).string(), "0x6b3FBEDcB9E106e84c3a47f63cf96Df8500bBc22");
+    }
+}
+
+TEST(HDWallet, IoTexKeys) {
+    const auto derivPath = "m/44'/304'/0'/0/0";
+    HDWallet wallet = HDWallet("token major laundry actor dish lunch physical machine kingdom adapt gym true", "");
+    {
+        const auto privateKey = wallet.getKey(TWCoinTypeIoTeX, DerivationPath(derivPath));
+        EXPECT_EQ(hex(privateKey.bytes), "3aa86eafa99cb9ae0f7c1c4f06391ffbef91578169715dfbdcdf76b532b73f24");
+        const auto p = privateKey.getPublicKey(TWPublicKeyTypeSECP256k1Extended);
+        EXPECT_EQ(hex(p.bytes), "042be00e86db75bbe3e8defe9bb09fbd5444eea10e2d53d55468f3d25bf3b0cb3ea8d992baba30c9353584b8ff061f8585cae1c792b8bb6f0607750dbf4fe8c760");
+        EXPECT_EQ(IoTeX::Address(p).string(), "io1dvlmah9euyrwsnp6glmre7tdlpgqh0pzz542zd");
+    }
+    // io1qmkv62pvg56qkashkwauhhjv3gtjhcm889r8dc
 }
 
 } // namespace TW::HDWalletTests

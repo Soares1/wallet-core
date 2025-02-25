@@ -1,8 +1,6 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #pragma once
 
@@ -45,6 +43,8 @@ public:
     static Encode tag(uint64_t value, const Encode& elem);
     /// encode a null value (special)
     static Encode null();
+    /// encode a version
+    static Encode version(uint64_t value);
 
     /// Stateful building (for indefinite length)
     /// Start an indefinite-length array

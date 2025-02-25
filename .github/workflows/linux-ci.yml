@@ -2,25 +2,30 @@ name: Linux CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ dev, master ]
   pull_request:
-    branches: [ master ]
+    branches: [ dev, master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    if: github.event.pull_request.draft == false
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Install system dependencies
       run: |
         tools/install-sys-dependencies-linux
         tools/install-rust-dependencies
     - name: Cache internal dependencies
       id: internal_cache
-      uses: actions/cache@v1.1.2
+      uses: actions/cache@v3
       with:
         path: build/local
-        key: ${{ runner.os }}-internal-${{ hashFiles('tools/install-dependencies') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/install-sys-dependencies-linux') }}-internal-${{ hashFiles('tools/install-dependencies') }}-${{ hashFiles('tools/dependencies-version') }}
     - name: Install internal dependencies
       run: |
         tools/install-dependencies
@@ -28,9 +33,16 @@ jobs:
         CC: /usr/bin/clang
         CXX: /usr/bin/clang++
       if: steps.internal_cache.outputs.cache-hit != 'true'
+
+    - name: Cache Rust
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: |
+          rust
+
     - name: Code generation
       run: |
-        tools/generate-files
+        tools/generate-files native
       env:
         CC: /usr/bin/clang
         CXX: /usr/bin/clang++

@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Base58.h"
 #include "HexCoding.h"
@@ -15,7 +13,7 @@ namespace TW::Waves::tests {
 
 TEST(TWAnySignerWaves, Sign) {
     auto input = Proto::SigningInput();
-    const auto privateKey = Base58::bitcoin.decode("83mqJpmgB5Mko1567sVAdqZxVKsT6jccXt3eFSi4G1zE");
+    const auto privateKey = Base58::decode("83mqJpmgB5Mko1567sVAdqZxVKsT6jccXt3eFSi4G1zE");
 
     input.set_timestamp(int64_t(1559146613));
     input.set_private_key(privateKey.data(), privateKey.size());

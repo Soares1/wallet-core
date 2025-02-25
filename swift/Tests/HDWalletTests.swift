@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 import WalletCore
 import XCTest
@@ -15,7 +13,7 @@ class HDWalletTests: XCTestCase {
     
     func testFromMnemonicImmutableXMainnetFromSignature() {
         let wallet = HDWallet(mnemonic: "obscure opera favorite shuffle mail tip age debate dirt pact cement loyal", passphrase: "")!
-        let starkDerivationPath = EthereumEip2645.getPath(ethAddress: "0xd0972E2312518Ca15A2304D56ff9cc0b7ea0Ea37", layer: "starkex", application: "immutablex", index: "1")
+        let starkDerivationPath = Ethereum.eip2645GetPath(ethAddress: "0xd0972E2312518Ca15A2304D56ff9cc0b7ea0Ea37", layer: "starkex", application: "immutablex", index: "1")
         XCTAssertEqual(starkDerivationPath, "m/2645'/579218131'/211006541'/2124474935'/1609799702'/1")
         
         // Retrieve eth private key
@@ -27,7 +25,7 @@ class HDWalletTests: XCTestCase {
         
         // Retrieve Stark Private key part
         let ethMsg = "Only sign this request if you’ve initiated an action with Immutable X."
-        let ethSignature = EthereumMessageSigner.signMessage(privateKey: ethPrivateKey, message: ethMsg)
+        let ethSignature = EthereumMessageSigner.signMessageImmutableX(privateKey: ethPrivateKey, message: ethMsg)
         XCTAssertEqual(ethSignature, "18b1be8b78807d3326e28bc286d7ee3d068dcd90b1949ce1d25c1f99825f26e70992c5eb7f44f76b202aceded00d74f771ed751f2fe538eec01e338164914fe001")
         let starkPrivateKey = StarkWare.getStarkKeyFromSignature(derivationPath: derivationPath, signature: ethSignature)
         XCTAssertEqual(starkPrivateKey.data.hexString, "04be51a04e718c202e4dca60c2b72958252024cfc1070c090dd0f170298249de")
@@ -36,7 +34,7 @@ class HDWalletTests: XCTestCase {
         
         // Account Register
         let ethMsgToRegister = "Only sign this key linking request from Immutable X"
-        let ethSignatureToRegister = EthereumMessageSigner.signMessage(privateKey: ethPrivateKey, message: ethMsgToRegister)
+        let ethSignatureToRegister = EthereumMessageSigner.signMessageImmutableX(privateKey: ethPrivateKey, message: ethMsgToRegister)
         XCTAssertEqual(ethSignatureToRegister, "646da4160f7fc9205e6f502fb7691a0bf63ecbb74bbb653465cd62388dd9f56325ab1e4a9aba99b1661e3e6251b42822855a71e60017b310b9f90e990a12e1dc01")
         let starkMsg = "463a2240432264a3aa71a5713f2a4e4c1b9e12bbb56083cd56af6d878217cf"
         let starkSignature = StarkExMessageSigner.signMessage(privateKey: starkPrivateKey, message: starkMsg)
@@ -102,6 +100,9 @@ class HDWalletTests: XCTestCase {
 
         let key3 = wallet.getKeyDerivation(coin: coin, derivation: .bitcoinTestnet)
         XCTAssertEqual(key3.data.hexString, "ca5845e1b43e3adf577b7f110b60596479425695005a594c88f9901c3afe864f")
+        
+        let key4 = wallet.getKeyDerivation(coin: coin, derivation: .bitcoinTaproot)
+        XCTAssertEqual(key4.data.hexString, "a2c4d6df786f118f20330affd65d248ffdc0750ae9cbc729d27c640302afd030")
     }
 
     func testGetAddressForCoin() {
@@ -121,6 +122,12 @@ class HDWalletTests: XCTestCase {
 
         let address2 = wallet.getAddressDerivation(coin: coin, derivation: .bitcoinLegacy)
         XCTAssertEqual(address2, "1PeUvjuxyf31aJKX6kCXuaqxhmG78ZUdL1")
+
+        let address3 = wallet.getAddressDerivation(coin: coin, derivation: .bitcoinTestnet)
+        XCTAssertEqual(address3, "tb1qwgpxgwn33z3ke9s7q65l976pseh4edrzfmyvl0")
+        
+        let address4 = wallet.getAddressDerivation(coin: coin, derivation: .bitcoinTaproot)
+        XCTAssertEqual(address4, "bc1pgqks0cynn93ymve4x0jq3u7hne77908nlysp289hc44yc4cmy0hslyckrz")
     }
 
     func testDerive() {
@@ -241,6 +248,15 @@ class HDWalletTests: XCTestCase {
         let address = AnyAddress(publicKey: key.getPublicKeySecp256k1(compressed: true), coin: binance)
 
         XCTAssertEqual("bnb1wk7kxw0qrvxe2pj9mk6ydjx0t4j9jla8pja0td", address.description)
+    }
+
+    func testDeriveBinanceTestnet() {
+        let binance = CoinType.binance
+        let wallet = HDWallet.test
+        let key = wallet.getKeyForCoin(coin: binance)
+        let address = AnyAddress(publicKey: key.getPublicKeySecp256k1(compressed: true), coin: binance, hrp: "tbnb")
+
+        XCTAssertEqual("tbnb1wk7kxw0qrvxe2pj9mk6ydjx0t4j9jla8085ttu", address.description)
     }
 
     func testDeriveZcash() {
