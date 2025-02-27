@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 package com.trustwallet.core.app.utils
 
@@ -29,7 +27,7 @@ class TestHDWallet {
     fun testCreateFromMnemonicImmutableXMainnetFromSignature() {
         // Successfully register: https://api.x.immutable.com/v1/users/0xd0972E2312518Ca15A2304D56ff9cc0b7ea0Ea37
         val hd = HDWallet("obscure opera favorite shuffle mail tip age debate dirt pact cement loyal", "")
-        val derivationPath = EthereumEip2645.getPath("0xd0972E2312518Ca15A2304D56ff9cc0b7ea0Ea37", "starkex", "immutablex", "1")
+        val derivationPath = Ethereum.eip2645GetPath("0xd0972E2312518Ca15A2304D56ff9cc0b7ea0Ea37", "starkex", "immutablex", "1")
         assertEquals(derivationPath, "m/2645'/579218131'/211006541'/2124474935'/1609799702'/1")
 
         // Retrieve eth private key
@@ -41,7 +39,7 @@ class TestHDWallet {
 
         // Retrieve Stark Private key part
         val ethMsg = "Only sign this request if you’ve initiated an action with Immutable X."
-        val ethSignature = EthereumMessageSigner.signMessage(ethPrivateKey, ethMsg)
+        val ethSignature = EthereumMessageSigner.signMessageImmutableX(ethPrivateKey, ethMsg)
         assertEquals(ethSignature, "18b1be8b78807d3326e28bc286d7ee3d068dcd90b1949ce1d25c1f99825f26e70992c5eb7f44f76b202aceded00d74f771ed751f2fe538eec01e338164914fe001")
         val starkPrivateKey = StarkWare.getStarkKeyFromSignature(starkDerivationPath, ethSignature)
         val starkPublicKey = starkPrivateKey.getPublicKeyByType(PublicKeyType.STARKEX)
@@ -50,7 +48,7 @@ class TestHDWallet {
 
         // Account register
         val ethMsgToRegister = "Only sign this key linking request from Immutable X"
-        val ethSignatureToRegister = EthereumMessageSigner.signMessage(ethPrivateKey, ethMsgToRegister)
+        val ethSignatureToRegister = EthereumMessageSigner.signMessageImmutableX(ethPrivateKey, ethMsgToRegister)
         assertEquals(ethSignatureToRegister, "646da4160f7fc9205e6f502fb7691a0bf63ecbb74bbb653465cd62388dd9f56325ab1e4a9aba99b1661e3e6251b42822855a71e60017b310b9f90e990a12e1dc01")
         val starkMsg = "463a2240432264a3aa71a5713f2a4e4c1b9e12bbb56083cd56af6d878217cf"
         val starkSignature = StarkExMessageSigner.signMessage(starkPrivateKey, starkMsg)
@@ -123,6 +121,9 @@ class TestHDWallet {
 
         val key3 = wallet.getKeyDerivation(coin, Derivation.BITCOINTESTNET)
         assertEquals(key3.data().toHex(), "0xca5845e1b43e3adf577b7f110b60596479425695005a594c88f9901c3afe864f")
+
+        val key4 = wallet.getKeyDerivation(coin, Derivation.BITCOINTAPROOT)
+        assertEquals(key4.data().toHex(), "0xa2c4d6df786f118f20330affd65d248ffdc0750ae9cbc729d27c640302afd030")
     }
 
     @Test
@@ -144,6 +145,12 @@ class TestHDWallet {
 
         val address2 = wallet.getAddressDerivation(coin, Derivation.BITCOINLEGACY)
         assertEquals(address2, "1PeUvjuxyf31aJKX6kCXuaqxhmG78ZUdL1")
+
+        val address3 = wallet.getAddressDerivation(coin, Derivation.BITCOINTESTNET)
+        assertEquals(address3, "tb1qwgpxgwn33z3ke9s7q65l976pseh4edrzfmyvl0")
+
+        val address4 = wallet.getAddressDerivation(coin, Derivation.BITCOINTAPROOT)
+        assertEquals(address4, "bc1pgqks0cynn93ymve4x0jq3u7hne77908nlysp289hc44yc4cmy0hslyckrz")
     }
 
     @Test

@@ -1,8 +1,6 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Address.h"
 #include "../Base58.h"
@@ -89,7 +87,7 @@ bool Address::extractKeyData(const std::string& string, Address* address) {
         return false;
     }
 
-    const Data& decodedBytes = Base58::bitcoin.decode(string.substr(prefixSize));
+    const Data& decodedBytes = Base58::decode(string.substr(prefixSize));
     if (decodedBytes.size() != KeyDataSize) {
         return false;
     }
@@ -139,7 +137,7 @@ Address::Address(const PublicKey& publicKey, Type type)
 
 /// Returns a string representation of the EOS address.
 std::string Address::string() const {
-    return prefix() + Base58::bitcoin.encode(keyData);
+    return prefix() + Base58::encode(keyData);
 }
 
 } // namespace TW::EOS

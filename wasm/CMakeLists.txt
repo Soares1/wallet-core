@@ -1,8 +1,6 @@
-# Copyright © 2017-2022 Trust Wallet.
+# SPDX-License-Identifier: Apache-2.0
 #
-# This file is part of Trust. The full Trust copyright notice, including
-# terms governing use, modification, and redistribution, is contained in the
-# file LICENSE at the root of the source code distribution tree.
+# Copyright © 2017 Trust Wallet.
 
 file(GLOB wasm_sources src/*.cpp src/generated/*.cpp)
 file(GLOB wasm_headers src/*.h src/generated/*.h)
@@ -40,5 +38,5 @@ set_target_properties(${TARGET_NAME}
 set_target_properties(${TARGET_NAME} 
         PROPERTIES 
         COMPILE_FLAGS "-O2 -sSTRICT -sUSE_BOOST_HEADERS=1"
-        LINK_FLAGS "--bind --no-entry --closure 1 -O2 -sSTRICT -sASSERTIONS -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1 -sDYNAMIC_EXECUTION=0"
+        LINK_FLAGS "--bind --no-entry --closure 1 -O2 -sSTRICT -sASSERTIONS -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1 -sDYNAMIC_EXECUTION=0 -s EXPORTED_FUNCTIONS=['_setThrew']"
 )
