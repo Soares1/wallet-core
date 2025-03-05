@@ -1,20 +1,18 @@
-// Copyright © 2017-2021 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Keystore/StoredKey.h"
 
-#include "Coin.h"
-#include "HexCoding.h"
-#include "Data.h"
-#include "PrivateKey.h"
-#include "Mnemonic.h"
 #include "Bitcoin/Address.h"
+#include "Coin.h"
+#include "Data.h"
+#include "HexCoding.h"
+#include "Mnemonic.h"
+#include "PrivateKey.h"
 
-#include <stdexcept>
 #include <gtest/gtest.h>
+#include <stdexcept>
 
 extern std::string TESTS_ROOT;
 
@@ -47,13 +45,15 @@ TEST(StoredKey, CreateWithMnemonic) {
     EXPECT_EQ(json["name"], "name");
     EXPECT_EQ(json["type"], "mnemonic");
     EXPECT_EQ(json["version"], 3);
+    // Salt is 32 bytes, encoded as hex.
+    EXPECT_EQ(json["crypto"]["kdfparams"]["salt"].get<std::string>().size(), 64ul);
 }
 
 TEST(StoredKey, CreateWithMnemonicInvalid) {
     try {
         auto key = StoredKey::createWithMnemonic("name", gPassword, "_THIS_IS_NOT_A_VALID_MNEMONIC_", TWStoredKeyEncryptionLevelDefault);
     } catch (std::invalid_argument&) {
-        // expedcted exception OK
+        // expected exception OK
         return;
     }
     FAIL() << "Missing excpected excpetion";
@@ -189,7 +189,7 @@ TEST(StoredKey, AccountGetDoesntChange) {
     vector<TWCoinType> coins = {coinTypeBc, coinTypeEth, coinTypeBnb};
     // retrieve multiple accounts, which will be created
     vector<Account> accounts;
-    for (auto coin: coins) {
+    for (auto coin : coins) {
         std::optional<Account> account = key.account(coin, &wallet);
         accounts.push_back(*account);
 
@@ -340,6 +340,15 @@ TEST(StoredKey, LoadPBKDF2Key) {
     EXPECT_EQ(hex(std::get<PBKDF2Parameters>(payload.params.kdfParams).salt), "ae3cd4e7013836a3df6bd7241b12db061dbe2c6785853cce422d148a624ce0bd");
 
     EXPECT_EQ(hex(payload.decrypt(TW::data("testpassword"))), "7a28b5ba57c53603b0b07b56bba752f7784bf506fa95edc395f5cf6c7514fe9d");
+
+    auto j = std::get<PBKDF2Parameters>(payload.params.kdfParams).json();
+    auto expected = R"|({"c":262144,"dklen":32,"salt":"ae3cd4e7013836a3df6bd7241b12db061dbe2c6785853cce422d148a624ce0bd"})|";
+    EXPECT_EQ(j.dump(), expected);
+}
+
+TEST(StoredKey, RandomPBKDF2Param) {
+    auto p = PBKDF2Parameters();
+    ASSERT_TRUE(p.salt.size() == 32ul);
 }
 
 TEST(StoredKey, LoadLegacyMnemonic) {
@@ -463,7 +472,7 @@ TEST(StoredKey, DecodingBitcoinAddress) {
 
     EXPECT_EQ(key.accounts[0].address, "3PWazDi9n1Hfyq9gXFxDxzADNL8RNYyK2y");
 }
-    
+
 TEST(StoredKey, RemoveAccount) {
     auto key = StoredKey::load(testDataPath("legacy-mnemonic.json"));
     EXPECT_EQ(key.accounts.size(), 2ul);
@@ -532,6 +541,7 @@ TEST(StoredKey, CreateMinimalEncryptionParameters) {
 
     EXPECT_EQ(json["crypto"]["kdf"], "scrypt");
     EXPECT_EQ(json["crypto"]["kdfparams"]["n"], 4096);
+    EXPECT_EQ(json["crypto"]["kdfparams"]["salt"].get<std::string>().size(), 64ul);
 
     // load it back
     const auto key2 = StoredKey::createWithJson(json);
@@ -550,6 +560,7 @@ TEST(StoredKey, CreateWeakEncryptionParameters) {
 
     EXPECT_EQ(json["crypto"]["kdf"], "scrypt");
     EXPECT_EQ(json["crypto"]["kdfparams"]["n"], 16384);
+    EXPECT_EQ(json["crypto"]["kdfparams"]["salt"].get<std::string>().size(), 64ul);
 
     // load it back
     const auto key2 = StoredKey::createWithJson(json);
@@ -568,10 +579,21 @@ TEST(StoredKey, CreateStandardEncryptionParameters) {
 
     EXPECT_EQ(json["crypto"]["kdf"], "scrypt");
     EXPECT_EQ(json["crypto"]["kdfparams"]["n"], 262144);
+    EXPECT_EQ(json["crypto"]["kdfparams"]["salt"].get<std::string>().size(), 64ul);
 
     // load it back
     const auto key2 = StoredKey::createWithJson(json);
     EXPECT_EQ(key2.wallet(gPassword).getMnemonic(), string(gMnemonic));
+}
+
+TEST(StoredKey, CreateEncryptionParametersRandomSalt) {
+    const auto key1 = StoredKey::createWithMnemonic("name", gPassword, gMnemonic, TWStoredKeyEncryptionLevelStandard);
+    const auto salt1 = parse_hex(key1.json()["crypto"]["kdfparams"]["salt"]);
+
+    const auto key2 = StoredKey::createWithMnemonic("name", gPassword, gMnemonic, TWStoredKeyEncryptionLevelStandard);
+    const auto salt2 = parse_hex(key2.json()["crypto"]["kdfparams"]["salt"]);
+
+    EXPECT_NE(salt1, salt2) << "salt must be random on every StoredKey creation";
 }
 
 TEST(StoredKey, CreateMultiAccounts) { // Multiple accounts for the same coin
@@ -592,7 +614,7 @@ TEST(StoredKey, CreateMultiAccounts) { // Multiple accounts for the same coin
         const auto coin = TWCoinTypeBitcoin;
 
         const auto btc1 = key.account(coin, &wallet);
-        
+
         EXPECT_TRUE(btc1.has_value());
         EXPECT_EQ(btc1->address, expectedBtc1);
         EXPECT_EQ(btc1->derivationPath.string(), "m/84'/0'/0'/0/0");
@@ -621,7 +643,7 @@ TEST(StoredKey, CreateMultiAccounts) { // Multiple accounts for the same coin
         const auto coin = TWCoinTypeBitcoin;
 
         const auto btc2 = key.account(coin, TWDerivationBitcoinLegacy, wallet);
-        
+
         EXPECT_EQ(btc2.address, expectedBtc2);
         EXPECT_EQ(btc2.derivationPath.string(), "m/44'/0'/0'/0/0");
         EXPECT_EQ(btc2.extendedPublicKey, "xpub6CR52eaUuVb4kXAVyHC2i5ZuqJ37oWNPZFtjXaazFPXZD45DwWBYEBLdrF7fmCR9pgBuCA9Q57zZfyJjDUBDNtWkhWuGHNYKLgDHpqrHsxV");

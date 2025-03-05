@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "TestUtilities.h"
 
@@ -17,7 +15,7 @@
 #include <TrustWalletCore/TWBase58.h>
 #include <TrustWalletCore/TWCoinType.h>
 #include <TrustWalletCore/TWSegwitAddress.h>
-#include <TrustWalletCore/TWEthereumEip2645.h>
+#include <TrustWalletCore/TWEthereum.h>
 #include <TrustWalletCore/TWEthereumMessageSigner.h>
 #include <TrustWalletCore/TWStarkExMessageSigner.h>
 #include <TrustWalletCore/TWStarkWare.h>
@@ -78,6 +76,11 @@ TEST(HDWallet, SeedWithExtraSpaces) {
 
 TEST(HDWallet, CreateFromMnemonicNoPassword) {
     auto wallet = WRAP(TWHDWallet, TWHDWalletCreateWithMnemonic(gWords.get(), STRING("").get()));
+    assertSeedEq(wallet, "354c22aedb9a37407adc61f657a6f00d10ed125efa360215f36c6919abd94d6dbc193a5f9c495e21ee74118661e327e84a5f5f11fa373ec33b80897d4697557d");
+}
+
+TEST(HDWallet, CreateFromMnemonicCheck) {
+    auto wallet = WRAP(TWHDWallet, TWHDWalletCreateWithMnemonicCheck(gWords.get(), STRING("").get(), false));
     assertSeedEq(wallet, "354c22aedb9a37407adc61f657a6f00d10ed125efa360215f36c6919abd94d6dbc193a5f9c495e21ee74118661e327e84a5f5f11fa373ec33b80897d4697557d");
 }
 
@@ -152,6 +155,13 @@ TEST(HDWallet, GetKeyDerivation) {
         auto publicKey = WRAP(TWPublicKey, TWPrivateKeyGetPublicKeySecp256k1(key.get(), true));
         auto publicKeyData = WRAPD(TWPublicKeyData(publicKey.get()));
         assertHexEqual(publicKeyData, "0240ebf906b948281289405317a5eb9a98045af8a8ab5311b2e3060cfb66c507a1");
+    }
+    {
+        auto key = WRAP(TWPrivateKey, TWHDWalletGetKeyDerivation(wallet.get(), TWCoinTypeBitcoin, TWDerivationBitcoinTaproot));
+        assertHexEqual(WRAPD(TWPrivateKeyData(key.get())), "a2c4d6df786f118f20330affd65d248ffdc0750ae9cbc729d27c640302afd030");
+        auto publicKey = WRAP(TWPublicKey, TWPrivateKeyGetPublicKeySecp256k1(key.get(), true));
+        auto publicKeyData = WRAPD(TWPublicKeyData(publicKey.get()));
+        assertHexEqual(publicKeyData, "026acc6c37789625ecd5ad4ebb7631249dfb9ebc3f82386f187325f54881557b9f");
     }
 }
 
@@ -286,11 +296,11 @@ TEST(HDWallet, DeriveAlgorand) {
     assertHexEqual(privateKeyData, "ce0b7ac644e2b7d9d14d3928b11643f43e48c33d3e328d059fef8add7f070e82");
 }
 
-TEST(HDWallet, DeriveElrond) {
+TEST(HDWallet, DeriveMultiversX) {
     auto wallet = WRAP(TWHDWallet, TWHDWalletCreateWithMnemonic(gWords.get(), gPassphrase.get()));
-    auto privateKey = WRAP(TWPrivateKey, TWHDWalletGetKeyForCoin(wallet.get(), TWCoinTypeElrond));
+    auto privateKey = WRAP(TWPrivateKey, TWHDWalletGetKeyForCoin(wallet.get(), TWCoinTypeMultiversX));
     auto privateKeyData = WRAPD(TWPrivateKeyData(privateKey.get()));
-    auto address = WRAPS(TWCoinTypeDeriveAddress(TWCoinTypeElrond, privateKey.get()));
+    auto address = WRAPS(TWCoinTypeDeriveAddress(TWCoinTypeMultiversX, privateKey.get()));
 
     assertHexEqual(privateKeyData, "0eb593141de897d60a0883320793eb49e63d556ccdf783a87ec014f150d50453");
     assertStringsEqual(address, "erd1a6l7q9cfvrgr80xuzm37tapdr4zm3mwrtl6vt8f45df45x7eadfs8ds5vv");
@@ -363,11 +373,15 @@ TEST(HDWallet, ExtendedKeysCustomAccount) {
 
     auto zprv0 = WRAPS(TWHDWalletGetExtendedPrivateKeyAccount(wallet.get(), TWPurposeBIP84, TWCoinTypeBitcoin, TWDerivationBitcoinSegwit, TWHDVersionZPRV, 0));
     assertStringsEqual(zprv0, "zprvAdG4iTXWBoARxkkzNpNh8r6Qag3irQB8PzEMkAFeTRXxHpbF9z4QgEvBRmfvqWvGp42t42nvgGpNgYSJA9iefm1yYNZKEm7z6qUWCroSQnE");
+    auto zprvTaproot = WRAPS(TWHDWalletGetExtendedPrivateKeyAccount(wallet.get(), TWPurposeBIP86, TWCoinTypeBitcoin, TWDerivationBitcoinTaproot, TWHDVersionZPRV, 0));
+    assertStringsEqual(zprvTaproot, "zprvAcMMthTpHWStuMM6r6wLFq5uiZhLN8sZCYyTCQLEF5XWgMtAgobYEqc95nLcWB43pCvLjbEu5HCEa8D5MjxcUdLdaeyQfojS5zpovJT6Swy");
     auto zprv1 = WRAPS(TWHDWalletGetExtendedPrivateKeyAccount(wallet.get(), TWPurposeBIP84, TWCoinTypeBitcoin, TWDerivationBitcoinSegwit, TWHDVersionZPRV, 1));
     assertStringsEqual(zprv1, "zprvAdG4iTXWBoAS2cCGuaGevCvH54GCunrvLJb2hoWCSuE3D9LS42XVg3c6sPm64w6VMq3w18vJf8nF3cBA2kUMkyWHsq6enWVXivzw42UrVHG");
 
     auto zpub0 = WRAPS(TWHDWalletGetExtendedPublicKeyAccount(wallet.get(), TWPurposeBIP84, TWCoinTypeBitcoin, TWDerivationBitcoinSegwit, TWHDVersionZPUB, 0));
     assertStringsEqual(zpub0, "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs");
+    auto zpubTaproot = WRAPS(TWHDWalletGetExtendedPublicKeyAccount(wallet.get(), TWPurposeBIP86, TWCoinTypeBitcoin, TWDerivationBitcoinTaproot, TWHDVersionZPUB, 0));
+    assertStringsEqual(zpubTaproot, "zpub6qLiJCzi7t1C7qRZx8ULcy2eGbXpmbbQZmu3znjqoR4VZADKELunndvcw4iSVaGx2KhviLLXuB3vcyGcdd2q8XXBQJc5T5qrtorRowa1zfs");
     auto zpub1 = WRAPS(TWHDWalletGetExtendedPublicKeyAccount(wallet.get(), TWPurposeBIP84, TWCoinTypeBitcoin, TWDerivationBitcoinSegwit, TWHDVersionZPUB, 1));
     assertStringsEqual(zpub1, "zpub6rFR7y4Q2AijF6Gk1bofHLs1d66hKFamhXWdWBup1Em25wfabZqkDqvaieV63fDQFaYmaatCG7jVNUpUiM2hAMo6SAVHcrUpSnHDpNzucB7");
 }
@@ -524,7 +538,7 @@ TEST(TWHDWallet, FromMnemonicImmutableXMainnetFromSignature) {
 
     // Retrieve Stark Private key part
     const auto ethMsg = STRING("Only sign this request if you’ve initiated an action with Immutable X.");
-    const auto ethSignature = WRAPS(TWEthereumMessageSignerSignMessage(ethPrivateKey.get(), ethMsg.get()));
+    const auto ethSignature = WRAPS(TWEthereumMessageSignerSignMessageImmutableX(ethPrivateKey.get(), ethMsg.get()));
     assertStringsEqual(ethSignature, "18b1be8b78807d3326e28bc286d7ee3d068dcd90b1949ce1d25c1f99825f26e70992c5eb7f44f76b202aceded00d74f771ed751f2fe538eec01e338164914fe001");
     const auto starkPrivateKey = WRAP(TWPrivateKey, TWStarkWareGetStarkKeyFromSignature(starkDerivationPath.get(), ethSignature.get()));
     const auto starkPrivateKeyData = WRAPD(TWPrivateKeyData(starkPrivateKey.get()));
@@ -535,7 +549,7 @@ TEST(TWHDWallet, FromMnemonicImmutableXMainnetFromSignature) {
 
     // Account register
     const auto ethMsgToRegister = STRING("Only sign this key linking request from Immutable X");
-    const auto ethSignatureToRegister = WRAPS(TWEthereumMessageSignerSignMessage(ethPrivateKey.get(), ethMsgToRegister.get()));
+    const auto ethSignatureToRegister = WRAPS(TWEthereumMessageSignerSignMessageImmutableX(ethPrivateKey.get(), ethMsgToRegister.get()));
     assertStringsEqual(ethSignatureToRegister, "646da4160f7fc9205e6f502fb7691a0bf63ecbb74bbb653465cd62388dd9f56325ab1e4a9aba99b1661e3e6251b42822855a71e60017b310b9f90e990a12e1dc01");
     const auto starkMsg = STRING("463a2240432264a3aa71a5713f2a4e4c1b9e12bbb56083cd56af6d878217cf");
     const auto starkSignature = WRAPS(TWStarkExMessageSignerSignMessage(starkPrivateKey.get(), starkMsg.get()));
