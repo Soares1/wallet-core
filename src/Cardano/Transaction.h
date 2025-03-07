@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #pragma once
 
@@ -17,6 +15,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <string>
+#include <set>
 
 namespace TW::Cardano {
 
@@ -25,17 +25,20 @@ typedef uint64_t Amount;
 class TokenAmount {
 public:
     std::string policyId;
-    std::string assetName;
+    Data assetName;
     uint256_t amount;
 
     TokenAmount() = default;
-    TokenAmount(std::string policyId, std::string assetName, uint256_t amount)
+    TokenAmount(std::string policyId, Data assetName, uint256_t amount)
         : policyId(std::move(policyId)), assetName(std::move(assetName)), amount(std::move(amount)) {}
 
     static TokenAmount fromProto(const Proto::TokenAmount& proto);
     Proto::TokenAmount toProto() const;
     /// Key used in TokenBundle
-    std::string key() const { return policyId + "_" + assetName; }
+    std::string key() const { return policyId + "_" + displayAssetName(); }
+    std::string displayAssetName() const;
+    /// Tries to convert the `assetName` to a UTF-8 string. Returns `std::nullopt` otherwise.
+    std::optional<std::string> assetNameToString() const;
 };
 
 class TokenBundle {
@@ -103,16 +106,23 @@ public:
     /// Token amounts (optional)
     TokenBundle tokenBundle;
 
+    /// Returns minimal amount of ADA for the output or `std::nullopt` if there a problem happened.
+    std::optional<uint64_t> minAdaAmount(uint64_t coinsPerUtxoByte) const noexcept;
+
     TxOutput() = default;
     TxOutput(Data address, Amount amount)
         : address(std::move(address)), amount(amount) {}
     TxOutput(Data address, Amount amount, TokenBundle tokenBundle)
         : address(std::move(address)), amount(amount), tokenBundle(std::move(tokenBundle)) {}
+
+    static TxOutput fromProto(const Proto::TxOutput& proto);
+    Proto::TxOutput toProto() const;
 };
 
 class TransactionPlan {
 public:
     std::vector<TxInput> utxos;
+    std::vector<TxOutput> extraOutputs;
     Amount availableAmount = 0;  // total coins in the input utxos
     Amount amount = 0;           // coins in the output UTXO
     Amount fee = 0;              // coin amount deducted as fee
@@ -139,6 +149,18 @@ public:
     Data key;
 };
 
+class DRepKey {
+public:
+    enum KeyType : uint8_t {
+        AddressKeyHash = 0,
+        // ScriptHash = 1,
+        DRepAlwaysAbstain = 2,
+        DRepNoConfidence = 3,
+    };
+    KeyType type;
+    Data key;
+};
+
 /// Certificate, mainly used for staking
 class Certificate {
 public:
@@ -146,12 +168,14 @@ public:
         SkatingKeyRegistration = 0,
         StakingKeyDeregistration = 1,
         Delegation = 2,
-        // StakePoolRegistration = 3, // not supported
+        VoteDelegation = 9,
     };
     CertificateType type;
     CertificateKey certKey;
     /// Optional PoolId, used in delegation
     Data poolId;
+    /// Optional DRepKey, used in DRep delegation
+    std::optional<DRepKey> drepKey;
 };
 
 /// Staking withdrawal

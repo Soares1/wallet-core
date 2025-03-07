@@ -1,8 +1,6 @@
-// Copyright © 2017-2022 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "HexCoding.h"
 #include "PublicKey.h"
@@ -11,7 +9,9 @@
 #include "Ontology/Ont.h"
 #include "Ontology/ParamsBuilder.h"
 
+#include <algorithm>
 #include <gtest/gtest.h>
+#include <iostream>
 
 namespace TW::Ontology::tests {
 
@@ -31,6 +31,7 @@ TEST(ParamsBuilder, pushInt) {
                                     4294967296,
                                     68719476735,
                                     68719476736,
+                                    281474976710655,
                                     72057594037927935,
                                     1152921504606846975};
     std::vector<std::string> codeVector{"00",
@@ -48,6 +49,7 @@ TEST(ParamsBuilder, pushInt) {
                                         "050000000001",
                                         "05ffffffff0f",
                                         "050000000010",
+                                        "07ffffffffffff00",
                                         "08ffffffffffffff00",
                                         "08ffffffffffffff0f"};
     for (auto index = 0ul; index < numVector.size(); index++) {
@@ -84,7 +86,7 @@ TEST(ParamsBuilder, transferInvokeCode) {
 
 TEST(ParamsBuilder, invokeOep4Code) {
     std::string wing_hex{"ff31ec74d01f7b7d45ed2add930f5d2239f7de33"};
-    auto wing_addr = Address(parse_hex(wing_hex.begin(), wing_hex.end()));
+    auto wing_addr = Address(parse_hex(wing_hex));
 
     NeoVmParamValue::ParamArray args{};
     std::string method{"name"};
@@ -96,7 +98,7 @@ TEST(ParamsBuilder, invokeOep4Code) {
 
 TEST(ParamsBuilder, invokeOep4CodeBalanceOf) {
     std::string wing_hex{"ff31ec74d01f7b7d45ed2add930f5d2239f7de33"};
-    auto wing_addr = Address(parse_hex(wing_hex.begin(), wing_hex.end()));
+    auto wing_addr = Address(parse_hex(wing_hex));
     auto user_addr = Address("AeaThtPwh5kAYnjHavzwmvxPd725nVTvbM");
     Data d(std::begin(user_addr._data), std::end(user_addr._data));
 
@@ -110,7 +112,7 @@ TEST(ParamsBuilder, invokeOep4CodeBalanceOf) {
 
 TEST(OntologyOep4, invokeOep4CodeTransfer) {
     std::string wing_hex{"ff31ec74d01f7b7d45ed2add930f5d2239f7de33"};
-    auto wing_addr = Address(parse_hex(wing_hex.begin(), wing_hex.end()));
+    auto wing_addr = Address(parse_hex(wing_hex));
     auto from = Address("APniYDGozkhUh8Tk7pe35aah2HGJ4fJfVd");
     auto to = Address("AVY6LfvxauVQAVHDV9hC3ZCv7cQqzfDotH");
     uint64_t amount = 253;

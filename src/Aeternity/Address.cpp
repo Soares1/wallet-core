@@ -1,8 +1,6 @@
-// Copyright © 2017-2020 Trust Wallet.
+// SPDX-License-Identifier: Apache-2.0
 //
-// This file is part of Trust. The full Trust copyright notice, including
-// terms governing use, modification, and redistribution, is contained in the
-// file LICENSE at the root of the source code distribution tree.
+// Copyright © 2017 Trust Wallet.
 
 #include "Address.h"
 #include "Identifiers.h"
@@ -38,12 +36,12 @@ Address::Address(const std::string& string) {
     }
 
     auto payload = string.substr(Identifiers::prefixAccountPubkey.size(), string.size());
-    bytes = Base58::bitcoin.decodeCheck(payload);
+    bytes = Base58::decodeCheck(payload);
 }
 
 /// Returns a string representation of the Aeternity address.
 std::string Address::string() const {
-    return Identifiers::prefixAccountPubkey + Base58::bitcoin.encodeCheck(bytes);
+    return Identifiers::prefixAccountPubkey + Base58::encodeCheck(bytes);
 }
 
 bool Address::checkType(const std::string& type) {
@@ -51,7 +49,7 @@ bool Address::checkType(const std::string& type) {
 }
 
 bool Address::checkPayload(const std::string& payload) {
-    unsigned long base58 = Base58::bitcoin.decodeCheck(payload).size();
+    unsigned long base58 = Base58::decodeCheck(payload).size();
     return base58 == size;
 }
 
